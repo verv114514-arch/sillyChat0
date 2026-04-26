@@ -33,6 +33,8 @@ class ChatSessionController extends GetxController {
   late TextEditingController commandController;
 
   VoidCallback? onLoadFinished;
+  VoidCallback? onAIStateUpdate;
+  VoidCallback? onGenerateStart;
 
   RxBool isLoading = false.obs;
 
@@ -130,6 +132,7 @@ class ChatSessionController extends GetxController {
         generateTitle();
       }
     });
+
     _aiState = ChatAIState(
             aihandler: Aihandler()
               ..onGenerateStateChange = (str) {
@@ -137,6 +140,12 @@ class ChatSessionController extends GetxController {
               })
         .obs;
     // 异步加载，显示进度条
+
+    ever(_aiState, (ev) {
+      if (onAIStateUpdate != null) {
+        onAIStateUpdate!();
+      }
+    });
     loadChat();
   }
 
@@ -605,8 +614,13 @@ class ChatSessionController extends GetxController {
         style: assistant.messageStyle,
         currentAssistant: assistantId));
 
+    if (onGenerateStart != null) {
+      onGenerateStart!();
+    }
+
     await for (String token in aiState.aihandler.requestTokenStream(options)) {
       final oldState = aiState;
+
       setAIState(oldState.copyWith(LLMBuffer: oldState.LLMBuffer + token));
       //LLMMessageBuffer.refresh();
     }

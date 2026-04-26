@@ -69,7 +69,7 @@ enum ChatMode { manual, auto, group }
 class _ChatPageState extends State<ChatPage> {
   late ChatSessionController sessionController;
 
-  final ItemScrollController _scrollController = ItemScrollController();
+  final ScrollController _scrollController = ScrollController();
 
   // 目前仅用于剪贴板
   final ChatController _chatController = Get.find<ChatController>();
@@ -122,6 +122,10 @@ class _ChatPageState extends State<ChatPage> {
   // 是否处于用户阅读历史的锁定状态
   bool _isUserReading = false;
 
+  bool _canGotoBottom = false;
+
+  bool _isRendering = false;
+
   @override
   void setState(VoidCallback fn) {
     super.setState(fn);
@@ -148,9 +152,21 @@ class _ChatPageState extends State<ChatPage> {
 
     sessionController.onLoadFinished = () {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _jumpToBottom();
+        _jumpToTrueBottom();
       });
     };
+
+    sessionController.onAIStateUpdate = () {
+      if (!_isUserReading) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      }
+    };
+
+    // sessionController.onGenerateStart = () {
+    //   _scrollToBottom();
+    // };
   }
 
   void _registerController(ChatSessionController controller) {
@@ -426,11 +442,13 @@ class _ChatPageState extends State<ChatPage> {
   // 选择消息时的底部操作菜单
   Widget _buildMessageButtonGroup(bool isSelected, MessageModel message) {
     return AnimatedOpacity(
-      opacity: isSelected ? 1.0 : 0.0,
+      opacity: 1, //isSelected ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 200),
-      child: isSelected
-          ? _buildMessageButtonGroupCommon(message)
-          : const SizedBox.shrink(),
+      // child: isSelected
+      //     ? _buildMessageButtonGroupCommon(message)
+      //     : const SizedBox(
+      //         height: 30,),
+      child: _buildMessageButtonGroupCommon(message),
     );
   }
 
@@ -594,26 +612,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
       ),
-    )
-        // :
-        // Material(
-        //     color: colors.surfaceContainerHighest.withOpacity(0.9),
-        //     borderRadius: BorderRadius.circular(12),
-        //     child: InkWell(
-        //       borderRadius: BorderRadius.circular(12),
-        //       onTap: onTap,
-        //       child: Padding(
-        //         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        //         child: Row(
-        //           mainAxisSize: MainAxisSize.min,
-        //           children: [
-        //             Icon(icon, size: 14, color: iconColor),
-        //           ],
-        //         ),
-        //       ),
-        //     ),
-        //   )
-        ;
+    );
   }
 
   // 消息发送方法
@@ -622,6 +621,8 @@ class _ChatPageState extends State<ChatPage> {
       if (isNewChat) {
         await _updateChat();
       }
+
+      //_scrollToBottom();
 
       sessionController.onSendMessage(text, selectedPath);
     }
@@ -774,7 +775,10 @@ class _ChatPageState extends State<ChatPage> {
                 padding: EdgeInsets.zero,
                 icon: Icon(Icons.keyboard_arrow_down_rounded,
                     color: colorScheme.primary, size: 20),
-                onPressed: _scrollToBottom),
+                onPressed: () {
+                  _isUserReading = false;
+                  _scrollToBottom();
+                }),
           ),
         ),
       ),
@@ -793,18 +797,19 @@ class _ChatPageState extends State<ChatPage> {
           onNotification: (ScrollNotification notification) {
             if (notification is UserScrollNotification) {
               // 在 reverse: true 下，ScrollDirection.forward 意味着手指往下拉（看旧消息）
-              if (notification.direction == ScrollDirection.forward &&
-                  notification.metrics.pixels > 600) {
+              if (notification.direction == ScrollDirection.forward) {
                 setState(() => _isUserReading = true);
-                print("看旧消息");
               }
             }
 
             // 如果用户手动滑动到了最新处（底部），解除锁定
-            if (notification.metrics.pixels <= 10) {
+            if (notification.metrics.pixels >=
+                _scrollController.position.maxScrollExtent - 10) {
               if (_isUserReading) {
                 setState(() => _isUserReading = false);
-                print("解除锁定");
+              }
+              if (_canGotoBottom) {
+                setState(() => _canGotoBottom = false);
               }
             }
             return false;
@@ -812,15 +817,16 @@ class _ChatPageState extends State<ChatPage> {
           child: Stack(
             children: [
               Obx(() {
-                final messages = chat.messages.reversed.toList();
+                final messages = chat.messages.toList();
                 // 聊天正文
-                return ScrollablePositionedList.builder(
-                    itemScrollController: _scrollController,
-                    reverse: true,
+                return ListView.builder(
+                    controller: _scrollController,
+                    //itemScrollController: _scrollController,
+                    //reverse: true,
                     itemCount: messages.length + 1,
                     shrinkWrap: true,
                     itemBuilder: (context, index) {
-                      if (index == 0) {
+                      if (index == messages.length) {
                         //正在（新）生成的Message，永远位于底部
                         return Obx(() => sessionController.aiState.isGenerating
                             ? _buildMessageBubble(
@@ -837,11 +843,11 @@ class _ChatPageState extends State<ChatPage> {
                             : const SizedBox.shrink());
                       } else {
                         return Builder(builder: (context) {
-                          final i = index - 1;
+                          final i = index;
 
                           final message = messages[i];
-                          return _buildMessageBubble(message,
-                              i < messages.length - 1 ? messages[i + 1] : null,
+                          return _buildMessageBubble(
+                              message, i > 0 ? messages[i - 1] : null,
                               index: i,
                               isNarration:
                                   message.style == MessageStyle.narration);
@@ -877,28 +883,49 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _scrollToMessage(MessageModel message) {
-    final index = chat.messages.reversed.toList().indexOf(message);
-    if (index >= 0 || index < chat.messages.length)
-      _scrollController.scrollTo(
-          index: index,
-          duration: Duration(milliseconds: 500),
-          alignment: 0,
-          curve: Curves.easeOut);
+    // final index = chat.messages.toList().indexOf(message);
+    // if (index >= 0 || index < chat.messages.length)
+    //   _scrollController.scrollTo(
+    //       index: index,
+    //       duration: Duration(milliseconds: 500),
+    //       alignment: 0,
+    //       curve: Curves.easeOut);
   }
 
   void _scrollToBottom() {
-    if (_scrollController.isAttached) {
-      _scrollController.scrollTo(
-          index: 0, //chat.messages.length - 1,
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(_scrollController.position.maxScrollExtent,
+          // index: chat.messages.length,
+          // alignment: -1,
           duration: Duration(milliseconds: 200),
           curve: Curves.easeOutQuad);
     }
   }
 
   void _jumpToBottom() {
-    if (_scrollController.isAttached) {
-      _scrollController.jumpTo(index: 0 //chat.messages.length,
-          );
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  }
+
+  // 递归滚动到底部
+  void _jumpToTrueBottom() {
+    if (!_scrollController.hasClients) return;
+
+    final position = _scrollController.position;
+
+    // 如果当前位置小于最大滚动距离，说明还在由于高度变化而“生成”新的底部
+    if (position.pixels < position.maxScrollExtent) {
+      position.jumpTo(position.maxScrollExtent);
+      // 关键：在下一帧重新检查并继续跳跃，直到确切到底
+      WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToTrueBottom());
+    } else {
+      // 真正到达底部了，结束初始化状态
+      if (mounted && _isRendering) {
+        setState(() {
+          _isRendering = false;
+        });
+      }
     }
   }
 
@@ -1286,7 +1313,7 @@ class _ChatPageState extends State<ChatPage> {
             return FadeTransition(opacity: animation, child: child);
           },
 
-          child: sessionController.isChatUninitialized
+          child: sessionController.isChatUninitialized || _isRendering
               ? Container(
                   key: const ValueKey('LoadScreen'),
                   child: sessionController.isLoading.value
