@@ -420,23 +420,25 @@ class _FileManagerWidgetState extends State<FileManagerWidget> {
   }
 
   Widget _buildFileList() {
+    final colors = Theme.of(context).colorScheme;
     if (_files.isEmpty) {
       if (_currentDirectory == widget.directory) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('无数据'),
-              SizedBox(
-                height: 16,
+              Icon(
+                size: 64,
+                Icons.inbox,
+                color: colors.outline,
               ),
-              ElevatedButton(
-                  onPressed: () async {
-                    await ChatController.of.loadChats();
-                    await ChatController.of.debug_moveAllChats();
-                    _loadFiles();
-                  },
-                  child: Text('从旧版本迁移'))
+              SizedBox(
+                height: 8,
+              ),
+              Text(
+                '无数据',
+                style: TextStyle(color: colors.outline),
+              ),
             ],
           ),
         );

@@ -23,6 +23,12 @@ class _CustomCodeBlockWidgetState extends State<CustomCodeBlockWidget> {
   bool _isCopied = false;
 
   @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -125,7 +131,7 @@ class _CustomCodeBlockWidgetState extends State<CustomCodeBlockWidget> {
           // 代码内容区域
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-            child: SelectableText(
+            child: Text(
               textScaler: widget.textScaler,
               widget.code,
               style: TextStyle(

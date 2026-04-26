@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_example/chat-app/providers/log_controller.dart';
 import 'package:flutter_example/main.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
-import 'package:flutter_markdown/flutter_markdown.dart'; // 引入JSON视图库
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 class LogDetailPage extends StatelessWidget {
   final LogEntry logEntry;

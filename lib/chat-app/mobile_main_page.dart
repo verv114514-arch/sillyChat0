@@ -104,7 +104,7 @@ class _MainPageMobileState extends State<MainPageMobile> {
     return Tooltip(
       message: "设置API",
       child: InkWell(
-        onTap: () async {
+        onTap: () async { 
           ModelSelectionResult? result = await customNavigate(
               ApiModelSelectionPage(
                 apiList: VaultSettingController.of().apis.value,

@@ -19,7 +19,7 @@ import 'package:flutter_example/chat-app/providers/vault_setting_controller.dart
 import 'package:flutter_example/chat-app/test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidResource;
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -210,7 +210,7 @@ class SillyChatApp extends StatelessWidget {
     }
     return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return Obx(() => GetMaterialApp(

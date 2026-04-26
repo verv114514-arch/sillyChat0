@@ -12,17 +12,15 @@ import 'package:flutter_example/chat-app/providers/vault_setting_controller.dart
 import 'package:flutter_example/chat-app/utils/customNav.dart';
 import 'package:flutter_example/chat-app/utils/entitys/ChatAIState.dart';
 import 'package:flutter_example/chat-app/utils/image_utils.dart';
-import 'package:flutter_example/chat-app/utils/markdown/latex_block_syntax.dart';
-import 'package:flutter_example/chat-app/utils/markdown/latex_element_builder.dart';
-import 'package:flutter_example/chat-app/utils/markdown/latex_inline_syntax.dart';
+import 'package:flutter_markdown_plus_latex/flutter_markdown_plus_latex.dart';
+
 import 'package:flutter_example/chat-app/widgets/AvatarImage.dart';
 import 'package:flutter_example/chat-app/widgets/chat/custom_codeblock_widget.dart';
 import 'package:flutter_example/chat-app/widgets/chat/think_widget.dart';
 import 'package:flutter_example/main.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:flutter_markdown/flutter_markdown.dart';
-// import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart'; // import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
 import 'package:get/get.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -226,7 +224,6 @@ class MessageBubble extends StatefulWidget {
   final bool isSelected;
   //final MessageStyle style;
   final void Function() onTap;
-  final void Function() onLongPress;
   final void Function() onUpdateChat;
   final Widget Function(bool isSelected, MessageModel message)
       buildBottomButtons;
@@ -241,7 +238,6 @@ class MessageBubble extends StatefulWidget {
       required this.message,
       required this.isSelected,
       required this.onTap,
-      required this.onLongPress,
       required this.buildBottomButtons,
       required this.onUpdateChat,
       //required this.style,
@@ -275,6 +271,9 @@ class _MessageBubbleState extends State<MessageBubble> {
 
   bool get isLoading => message.id == -9999;
   MessageStyle get style => message.style;
+
+  DateTime? _pointerDownTime;
+  Offset? _pointerDownPosition;
 
   @override
   void initState() {
@@ -559,72 +558,78 @@ class _MessageBubbleState extends State<MessageBubble> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (message.resPath.isNotEmpty) _buildMessageImage(),
-              MarkdownBody(
-                data: content,
-                onTapLink: (text, href, title) {
-                  _launchURL(href ?? '');
-                },
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(
-                    color: textColor,
-                  ),
-                  em: TextStyle(
-                    color: isMe ? textColor : colors.outline,
-                  ),
-                  horizontalRuleDecoration: BoxDecoration(
-                    border: Border.all(width: 1, color: colors.outlineVariant),
-                  ),
-                  textScaler:
-                      TextScaler.linear(displaySetting.ContentFontScale),
-                  blockquoteDecoration: BoxDecoration(
-                    color: isMe
-                        ? colors.primary.withOpacity(0.06)
-                        : colors.surfaceVariant.withOpacity(0.04),
-                    border: Border(
-                      left: BorderSide(
-                        color: isMe
-                            ? colors.primary
-                            : colors.primary.withOpacity(0.8),
-                        width: 4,
-                      ),
+              SelectionArea(
+                child: MarkdownBody(
+                  data: content,
+                  onTapLink: (text, href, title) {
+                    _launchURL(href ?? '');
+                  },
+                  //selectable: true,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: textColor,
                     ),
-                    borderRadius: BorderRadius.circular(6),
+                    em: TextStyle(
+                      color: isMe ? textColor : colors.outline,
+                    ),
+                    horizontalRuleDecoration: BoxDecoration(
+                      border:
+                          Border.all(width: 1, color: colors.outlineVariant),
+                    ),
+                    textScaler:
+                        TextScaler.linear(displaySetting.ContentFontScale),
+                    blockquoteDecoration: BoxDecoration(
+                      color: isMe
+                          ? colors.primary.withOpacity(0.06)
+                          : colors.surfaceVariant.withOpacity(0.04),
+                      border: Border(
+                        left: BorderSide(
+                          color: isMe
+                              ? colors.primary
+                              : colors.primary.withOpacity(0.8),
+                          width: 4,
+                        ),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    blockquote: TextStyle(
+                      color: isMe ? colors.onPrimary : colors.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
-                  blockquote: TextStyle(
-                    color: isMe ? colors.onPrimary : colors.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
-                  ),
+                  builders: isMe
+                      ? {}
+                      : {
+                          'quotedText': QuotedTextBuilder(TextScaler.linear(
+                              displaySetting.ContentFontScale)),
+                          'font': FontColorBuilder(),
+                          'pre': CodeBlockBuilder(TextScaler.linear(
+                              displaySetting.ContentFontScale)),
+                          'latex': LatexElementBuilder(
+                            textStyle: const TextStyle(
+                              // color: Colors.blue,
+                              fontWeight: FontWeight.w100,
+                            ),
+                            textScaleFactor: displaySetting.ContentFontScale,
+                          ),
+                        },
+                  extensionSet: md.ExtensionSet([
+                    const md.FencedCodeBlockSyntax(),
+                    const md.TableSyntax(),
+                    const md.UnorderedListWithCheckboxSyntax(),
+                    const md.OrderedListWithCheckboxSyntax(),
+                    const md.FootnoteDefSyntax(),
+                    //const md.HtmlBlockSyntax(),
+                    LatexBlockSyntax()
+                  ], [
+                    QuotedTextSyntax(),
+                    //HtmlTagSyntax(),
+                    LatexInlineSyntax()
+                  ]),
+                  softLineBreak: true,
+                  shrinkWrap: true,
+                  inlineSyntaxes: [],
                 ),
-                builders: isMe
-                    ? {}
-                    : {
-                        'quotedText': QuotedTextBuilder(
-                            TextScaler.linear(displaySetting.ContentFontScale)),
-                        'font': FontColorBuilder(),
-                        'pre': CodeBlockBuilder(
-                            TextScaler.linear(displaySetting.ContentFontScale)),
-
-                        // 'latex': LatexElementBuilder(
-                        //   // textStyle: const TextStyle(color: Colors.blue),
-                        //   textScaleFactor: 1.2,
-                        // ),
-                      },
-                extensionSet: md.ExtensionSet([
-                  const md.FencedCodeBlockSyntax(),
-                  const md.TableSyntax(),
-                  const md.UnorderedListWithCheckboxSyntax(),
-                  const md.OrderedListWithCheckboxSyntax(),
-                  const md.FootnoteDefSyntax(),
-                  //const md.HtmlBlockSyntax(),
-                  LatexBlockSyntax()
-                ], [
-                  QuotedTextSyntax(),
-                  //HtmlTagSyntax(),
-                  LatexInlineSyntax()
-                ]),
-                softLineBreak: true,
-                shrinkWrap: true,
-                inlineSyntaxes: [],
               ),
             ],
           );
@@ -707,7 +712,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 )),
           ),
           SizedBox(
-            height: 16,
+            height: 8,
           ),
           widget.buildBottomButtons(widget.isSelected, message)
         ],
@@ -752,10 +757,25 @@ class _MessageBubbleState extends State<MessageBubble> {
     }
 
     return Obx(() {
-      var gestureDetector = GestureDetector(
-        //behavior: HitTestBehavior.translucent,
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
+      var gestureDetector = Listener(
+        // onTap: widget.onTap,
+        // onLongPress: widget.onLongPress,
+        onPointerDown: (event) {
+          _pointerDownTime = DateTime.now();
+          _pointerDownPosition = event.position;
+        },
+        onPointerUp: (event) {
+          if (_pointerDownTime != null && _pointerDownPosition != null) {
+            final duration = DateTime.now().difference(_pointerDownTime!);
+            final distance = (event.position - _pointerDownPosition!).distance;
+
+            // 判定条件：按下到抬起小于 200ms，且移动距离小于 10 像素
+            if (duration < const Duration(milliseconds: 200) &&
+                distance < 10.0) {
+              widget.onTap();
+            }
+          }
+        },
         child: style == MessageStyle.narration
             ? _buildNarration()
             : style == MessageStyle.summary
