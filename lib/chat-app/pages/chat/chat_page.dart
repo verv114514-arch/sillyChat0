@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_example/chat-app/constants.dart';
 import 'package:flutter_example/chat-app/models/api_model.dart';
@@ -72,8 +73,6 @@ class _ChatPageState extends State<ChatPage> {
 
   // 目前仅用于剪贴板
   final ChatController _chatController = Get.find<ChatController>();
-  final CharacterController _characterController =
-      Get.find<CharacterController>();
   final VaultSettingController _settingController = Get.find();
 
   final bool isDesktop = SillyChatApp.isDesktop();
@@ -93,8 +92,6 @@ class _ChatPageState extends State<ChatPage> {
   ChatMode get mode => chat.mode ?? ChatMode.auto;
   bool get isAutoMode => mode == ChatMode.auto;
   bool get isGroupMode => mode == ChatMode.group;
-
-  bool isThinkMode = false;
 
   // 是否为新聊天
   bool get isNewChat => chat.id == -1;
@@ -122,6 +119,9 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<List<String>>? simulateUserFuture;
 
+  // 是否处于用户阅读历史的锁定状态
+  bool _isUserReading = false;
+
   @override
   void setState(VoidCallback fn) {
     super.setState(fn);
@@ -139,16 +139,18 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     _registerController(widget.sessionController);
-    // if (chat.mode != null) {
-    //   mode = chat.mode!;
-    //   print('$mode');
+
+    // if (widget.initialPosition != null) {
+    //   WidgetsBinding.instance.addPostFrameCallback((_) {
+    //     _scrollToMessage(widget.initialPosition!);
+    //   });
     // }
 
-    if (widget.initialPosition != null) {
+    sessionController.onLoadFinished = () {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToMessage(widget.initialPosition!);
+        _jumpToBottom();
       });
-    }
+    };
   }
 
   void _registerController(ChatSessionController controller) {
@@ -324,19 +326,6 @@ class _ChatPageState extends State<ChatPage> {
           message: message,
         ),
         context: context);
-  }
-
-  void _showCharacterExecuter(BuildContext context) async {
-    return await showModalBottomSheet(
-        context: context,
-        builder: (BuildContext context) {
-          return CharacterExecuter(onToggleMember: (char) {
-            sessionController
-                .onGroupMessage(CharacterController.of.getCharacterById(char));
-            VaultSettingController.of().addToCharacterHistory(char);
-            Get.back();
-          });
-        });
   }
 
   /// 显示“选择最近聊天”弹窗
@@ -587,7 +576,6 @@ class _ChatPageState extends State<ChatPage> {
     required VoidCallback onTap,
     Color? iconColor,
   }) {
-    final colors = Theme.of(context).colorScheme;
     return
         // isDesktop
         //     ?
@@ -690,8 +678,6 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildInputBar() {
-    final colors = Theme.of(context).colorScheme;
-
     return Container(
         color: Colors
             .transparent, //isDesktop ? colors.surfaceContainerHigh : colors.surface,
@@ -765,8 +751,37 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  Widget _buildToBottomButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Positioned(
+      bottom: 148,
+      right: 24,
+      child: AnimatedScale(
+        scale: _isUserReading ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: AnimatedOpacity(
+          opacity: _isUserReading ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: Material(
+            // 使用 SurfaceVariant，带一点点色调的浅色，比纯白更有质感
+            color: colorScheme.surfaceVariant.withOpacity(0.9),
+            elevation: 4,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: IconButton(
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+                icon: Icon(Icons.keyboard_arrow_down_rounded,
+                    color: colorScheme.primary, size: 20),
+                onPressed: _scrollToBottom),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFlutterMessageList() {
-    final colors = Theme.of(context).colorScheme;
     return ConstrainedBox(
       constraints: const BoxConstraints(
         minHeight: 0.0,
@@ -774,51 +789,70 @@ class _ChatPageState extends State<ChatPage> {
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: Stack(
-          children: [
-            Obx(() {
-              final messages = chat.messages.reversed.toList();
-              // 聊天正文
-              return ScrollablePositionedList.builder(
-                  itemScrollController: _scrollController,
-                  reverse: true,
-                  // TODO:页面原地刷新时  ScrollerController报错
-                  // Failed assertion: line 264 pos 12: '_scrollableListState == null': is not true.
-                  //itemScrollController: _scrollController,
-                  itemCount: messages.length + 1,
-                  shrinkWrap: true,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      //正在（新）生成的Message，永远位于底部
-                      return Obx(() => sessionController.aiState.isGenerating
-                          ? _buildMessageBubble(
-                              MessageModel(
-                                  id: -9999,
-                                  content: sessionController.aiState.LLMBuffer,
-                                  senderId: sessionController
-                                      .aiState.currentAssistant,
-                                  time: DateTime.now(),
-                                  alternativeContent: [null],
-                                  style: sessionController.aiState.style),
-                              messages.length == 0 ? null : messages[0])
-                          : const SizedBox.shrink());
-                    } else {
-                      return Builder(builder: (context) {
-                        final i = index - 1;
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification notification) {
+            if (notification is UserScrollNotification) {
+              // 在 reverse: true 下，ScrollDirection.forward 意味着手指往下拉（看旧消息）
+              if (notification.direction == ScrollDirection.forward &&
+                  notification.metrics.pixels > 600) {
+                setState(() => _isUserReading = true);
+                print("看旧消息");
+              }
+            }
 
-                        final message = messages[i];
-                        return _buildMessageBubble(message,
-                            i < messages.length - 1 ? messages[i + 1] : null,
-                            index: i,
-                            isNarration:
-                                message.style == MessageStyle.narration);
-                      });
+            // 如果用户手动滑动到了最新处（底部），解除锁定
+            if (notification.metrics.pixels <= 10) {
+              if (_isUserReading) {
+                setState(() => _isUserReading = false);
+                print("解除锁定");
+              }
+            }
+            return false;
+          },
+          child: Stack(
+            children: [
+              Obx(() {
+                final messages = chat.messages.reversed.toList();
+                // 聊天正文
+                return ScrollablePositionedList.builder(
+                    itemScrollController: _scrollController,
+                    reverse: true,
+                    itemCount: messages.length + 1,
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        //正在（新）生成的Message，永远位于底部
+                        return Obx(() => sessionController.aiState.isGenerating
+                            ? _buildMessageBubble(
+                                MessageModel(
+                                    id: -9999,
+                                    content:
+                                        sessionController.aiState.LLMBuffer,
+                                    senderId: sessionController
+                                        .aiState.currentAssistant,
+                                    time: DateTime.now(),
+                                    alternativeContent: [null],
+                                    style: sessionController.aiState.style),
+                                messages.length == 0 ? null : messages[0])
+                            : const SizedBox.shrink());
+                      } else {
+                        return Builder(builder: (context) {
+                          final i = index - 1;
+
+                          final message = messages[i];
+                          return _buildMessageBubble(message,
+                              i < messages.length - 1 ? messages[i + 1] : null,
+                              index: i,
+                              isNarration:
+                                  message.style == MessageStyle.narration);
+                        });
+                      }
                     }
-                  }
-                  //},
-                  );
-            }),
-          ],
+                    //},
+                    );
+              }),
+            ],
+          ),
         ),
       ),
     );
@@ -850,6 +884,22 @@ class _ChatPageState extends State<ChatPage> {
           duration: Duration(milliseconds: 500),
           alignment: 0,
           curve: Curves.easeOut);
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.isAttached) {
+      _scrollController.scrollTo(
+          index: 0, //chat.messages.length - 1,
+          duration: Duration(milliseconds: 200),
+          curve: Curves.easeOutQuad);
+    }
+  }
+
+  void _jumpToBottom() {
+    if (_scrollController.isAttached) {
+      _scrollController.jumpTo(index: 0 //chat.messages.length,
+          );
+    }
   }
 
   PreferredSizeWidget? _buildAppBar() {
@@ -1079,6 +1129,7 @@ class _ChatPageState extends State<ChatPage> {
             if (chat.backgroundOrCharBackground != null)
               _buildBackgroundImage(),
             _buildMainContent(),
+            _buildToBottomButton()
           ],
         ),
       ),

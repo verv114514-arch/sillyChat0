@@ -32,6 +32,8 @@ class ChatSessionController extends GetxController {
   late TextEditingController inputController;
   late TextEditingController commandController;
 
+  VoidCallback? onLoadFinished;
+
   RxBool isLoading = false.obs;
 
   // 当前会话是否处于前台
@@ -186,13 +188,17 @@ class ChatSessionController extends GetxController {
       _chat.value = ChatModel.fromJson(data);
       //chat.fileId = 0; // fileId字段已弃用
       chat.file = chatFile;
-      chat.folderSettingPath =  ChatController.of.getFolderSettingByChatPath(chatPath).$2;
+      chat.folderSettingPath =
+          ChatController.of.getFolderSettingByChatPath(chatPath).$2;
     } else {
       //Get.snackbar('聊天加载失败.', '聊天文件不存在');
     }
 
     isLoading.value = false;
     updateTokens();
+    if (onLoadFinished != null) {
+      onLoadFinished!();
+    }
   }
 
   Future<void> saveChat() async {
@@ -216,7 +222,7 @@ class ChatSessionController extends GetxController {
       //Get.snackbar('聊天${file?.path ?? '<未创建>'}保存失败.', '聊天文件不存在');
     }
   }
-  
+
   void bindWebController(WebSessionController controller) {
     const int? maxMessages = 10;
 
@@ -383,7 +389,7 @@ class ChatSessionController extends GetxController {
   }
 
   // 检查是否是最后一条消息
-  bool isLastMessage(MessageModel message){
+  bool isLastMessage(MessageModel message) {
     return message.id == chat.messages.last.id;
   }
 
