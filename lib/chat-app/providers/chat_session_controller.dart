@@ -581,6 +581,10 @@ class ChatSessionController extends GetxController {
     ChatOptionModel? overrideOption,
     CharacterModel? overrideAssistant = null,
   }) async* {
+    if (onGenerateStart != null) {
+      onGenerateStart!();
+    }
+
     late List<LLMMessage> messages;
 
     // 附加指令
@@ -613,10 +617,6 @@ class ChatSessionController extends GetxController {
         GenerateState: "正在激活世界书...",
         style: assistant.messageStyle,
         currentAssistant: assistantId));
-
-    if (onGenerateStart != null) {
-      onGenerateStart!();
-    }
 
     await for (String token in aiState.aihandler.requestTokenStream(options)) {
       final oldState = aiState;

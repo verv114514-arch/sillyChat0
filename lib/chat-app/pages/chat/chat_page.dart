@@ -153,6 +153,7 @@ class _ChatPageState extends State<ChatPage> {
     sessionController.onLoadFinished = () {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _jumpToTrueBottom();
+        _isUserReading = false;
       });
     };
 
@@ -164,9 +165,10 @@ class _ChatPageState extends State<ChatPage> {
       }
     };
 
-    // sessionController.onGenerateStart = () {
-    //   _scrollToBottom();
-    // };
+    sessionController.onGenerateStart = () {
+      _isUserReading = false;
+      //_scrollToBottom();
+    };
   }
 
   void _registerController(ChatSessionController controller) {
@@ -440,88 +442,118 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // 选择消息时的底部操作菜单
-  Widget _buildMessageButtonGroup(bool isSelected, MessageModel message) {
+  Widget _buildMessageToolbar(bool isSelected, MessageModel message) {
     return AnimatedOpacity(
-      opacity: 1, //isSelected ? 1.0 : 0.0,
+      opacity: isSelected ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 200),
-      // child: isSelected
-      //     ? _buildMessageButtonGroupCommon(message)
-      //     : const SizedBox(
-      //         height: 30,),
-      child: _buildMessageButtonGroupCommon(message),
+      // 当不可见时，设置 ignoring 为 true，屏蔽所有点击事件
+      child: IgnorePointer(
+        ignoring: !isSelected,
+        child: _buildMessageToolbarCommon(message),
+      ),
     );
   }
 
-  Widget _buildMessageButtonGroupCommon(MessageModel message) {
-    var colors = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildActionButton(
-          icon: Icons.edit_outlined,
-          label: '编辑',
-          onTap: () {
-            _showEditDialog(message);
-          },
-        ),
-        const SizedBox(width: 8),
-        _buildActionButton(
-          icon: Icons.delete_outline,
-          label: '删除',
-          onTap: () => _showDeleteConfirmation(message),
-        ),
-        const SizedBox(width: 8),
-        _buildActionButton(
-          icon: Icons.copy,
-          label: '复制',
-          onTap: () async {
+  Widget _buildMessageToolbarCommon(MessageModel message) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      // 增加内边距让内部紧凑
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        // 背景色：使用 surfaceContainer 或 surface
+        color: colorScheme.surfaceContainerLow,
+        // 圆角：营造面板感
+        borderRadius: BorderRadius.circular(10),
+        // 边框：可选，让边缘更清晰
+        border: Border.all(
+            color: colorScheme.outlineVariant.withOpacity(0.5), width: 0.5),
+        // 阴影：增加层次感，防止与文字混合
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // --- 核心操作区 ---
+          _buildCompactAction(
+              Icons.edit_outlined, '编辑', () => _showEditDialog(message)),
+          _buildCompactAction(Icons.copy_outlined, '复制', () async {
             await Clipboard.setData(ClipboardData(text: message.content));
             SillyChatApp.snackbar(context, '复制成功');
-          },
-        ),
-        if (sessionController.isLastMessage(message) &&
-            !sessionController.isGenerating) ...[
-          const SizedBox(width: 8),
-          _buildActionButton(
-            icon: Icons.refresh,
-            label: '重新生成',
-            onTap: () => sessionController.onRetry(),
-          ),
-        ],
-        const SizedBox(width: 8),
-        _buildActionButton(
-          icon: Icons.more_horiz,
-          label: '更多',
-          onTap: () => _showMoreMessageButton(message),
-        ),
-        const SizedBox(width: 8),
-        if (message.alternativeContent.length > 1) ...[
-          _buildActionButton(
-            icon: Icons.chevron_left,
-            label: null,
-            onTap: () => _switchAlternativeContent(message, false),
-          ),
-          Padding(
-            child: Text(
-              '${message.alternativeContent.indexWhere((e) => e == null) + 1}/${message.alternativeContent.length}',
-              style: TextStyle(fontSize: 12),
+          }),
+          _buildCompactAction(Icons.delete_outline, '删除',
+              () => _showDeleteConfirmation(message)),
+
+          // --- 条件按钮：重新生成 ---
+          if (sessionController.isLastMessage(message) &&
+              !sessionController.isGenerating)
+            _buildCompactAction(
+                Icons.refresh, '重试', () => sessionController.onRetry()),
+
+          // --- 条件按钮：切换版本 (Alternative Content) ---
+          if (message.alternativeContent.length > 1) ...[
+            const VerticalDivider(width: 12, indent: 8, endIndent: 8), // 垂直分割线
+            _buildCompactAction(Icons.chevron_left, null,
+                () => _switchAlternativeContent(message, false)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Text(
+                '${message.alternativeContent.indexWhere((e) => e == null) + 1}/${message.alternativeContent.length}',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary),
+              ),
             ),
-            padding: EdgeInsets.only(bottom: 2, left: 2, right: 2),
-          ),
-          _buildActionButton(
-            icon: Icons.chevron_right,
-            label: null,
-            onTap: () => _switchAlternativeContent(message, true),
-          ),
+            _buildCompactAction(Icons.chevron_right, null,
+                () => _switchAlternativeContent(message, true)),
+          ],
+
+          _buildCompactAction(
+              Icons.more_horiz, '更多', () => _showMoreMessageButton(message)),
+
+          // --- 后置信息：字数 ---
+          if (message.isAssistant) ...[
+            const SizedBox(width: 6),
+            Text(
+              '${message.content.length}字',
+              style: TextStyle(fontSize: 10, color: colorScheme.outline),
+            ),
+          ],
         ],
-        if (message.isAssistant) ...[
-          const SizedBox(width: 8),
-          Text(
-            '${message.content.length}字',
-            style: TextStyle(fontSize: 12.0, color: colors.outline),
-          )
-        ],
-      ],
+      ),
+    );
+  }
+
+  Widget _buildCompactAction(IconData icon, String? label, VoidCallback onTap) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+              // if (label != null) // 可选：如果希望极度紧凑，可以像微信一样长按才显示文字或只显示图标
+              //   Text(label,
+              //       style: TextStyle(
+              //           fontSize: 9, color: colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -569,7 +601,7 @@ class _ChatPageState extends State<ChatPage> {
         });
       },
       index: index,
-      buildBottomButtons: _buildMessageButtonGroup,
+      buildBottomButtons: _buildMessageToolbar,
       onUpdateChat: _updateChat,
       state: sessionController.aiState,
     );
@@ -622,9 +654,10 @@ class _ChatPageState extends State<ChatPage> {
         await _updateChat();
       }
 
-      //_scrollToBottom();
+      await sessionController.onSendMessage(text, selectedPath);
 
-      sessionController.onSendMessage(text, selectedPath);
+      _scrollToBottom();
+      _isUserReading = false;
     }
   }
 
@@ -804,12 +837,9 @@ class _ChatPageState extends State<ChatPage> {
 
             // 如果用户手动滑动到了最新处（底部），解除锁定
             if (notification.metrics.pixels >=
-                _scrollController.position.maxScrollExtent - 10) {
+                _scrollController.position.maxScrollExtent) {
               if (_isUserReading) {
                 setState(() => _isUserReading = false);
-              }
-              if (_canGotoBottom) {
-                setState(() => _canGotoBottom = false);
               }
             }
             return false;

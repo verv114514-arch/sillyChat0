@@ -12,6 +12,7 @@ import 'package:flutter_example/chat-app/providers/vault_setting_controller.dart
 import 'package:flutter_example/chat-app/utils/customNav.dart';
 import 'package:flutter_example/chat-app/utils/entitys/ChatAIState.dart';
 import 'package:flutter_example/chat-app/utils/image_utils.dart';
+import 'package:flutter_example/chat-app/widgets/sticky_overlay_container.dart';
 import 'package:flutter_markdown_plus_latex/flutter_markdown_plus_latex.dart';
 
 import 'package:flutter_example/chat-app/widgets/AvatarImage.dart';
@@ -638,17 +639,32 @@ class _MessageBubbleState extends State<MessageBubble> {
   Widget _buildMessageBubbleBody(String content) {
     final colors = Theme.of(context).colorScheme;
 
-    // 气泡外的动画效果、加载条
-    return Stack(
-      children: [
-        displaySetting.messageBubbleStyle == MessageBubbleStyle.bubble
-            ? Container(
-                decoration: BoxDecoration(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+
+        // 1. 计算/预估消息内容的宽度
+        // 这里可以根据字体大小粗略计算，或者使用更精确的 TextPainter
+        final textStyle = Theme.of(context).textTheme.bodyMedium;
+        final textPainter = TextPainter(
+          text: TextSpan(text: content, style: textStyle),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: maxWidth);
+
+        final contentWidth = textPainter.width + 24; // 24 是 padding (12*2)
+        final buttonWidth = 80.0; // 假设你的按钮 row 大约占用 80dp
+
+        // 2. 判断是否属于“短消息”：内容宽度 + 按钮宽度 < 总宽度
+        final bool isShortMessage = (contentWidth + buttonWidth) < maxWidth;
+
+        // 提取原始的气泡内容部分，避免重复代码
+        Widget bubbleContent = Container(
+          decoration: displaySetting.messageBubbleStyle ==
+                  MessageBubbleStyle.bubble
+              ? BoxDecoration(
                   color: isMe
                       ? colors.primary
-                      : isDesktop
-                          ? colors.surface
-                          : colors.surfaceContainer,
+                      : (isDesktop ? colors.surface : colors.surfaceContainer),
                   borderRadius: BorderRadius.circular(
                       displaySetting.MessageBubbleBorderRadius),
                   boxShadow: [
@@ -658,29 +674,59 @@ class _MessageBubbleState extends State<MessageBubble> {
                       offset: Offset(0, 2),
                     ),
                   ],
-                ),
-                padding: const EdgeInsets.all(12),
-                child: _buildMessageContent(content))
-            : displaySetting.messageBubbleStyle == MessageBubbleStyle.compact
-                ? Column(
-                    children: [
-                      _buildMessageContent(content),
-                      SizedBox(
-                        height: 16,
-                      )
-                    ],
-                  )
-                : _buildMessageContent(content),
-        if (isLoading)
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0, // 假设一个ProgressIndicator的高度
-            child: const LinearProgressIndicator(
-              backgroundColor: Colors.transparent,
+                )
+              : null,
+          padding: const EdgeInsets.all(12),
+          child: _buildMessageContent(content),
+        );
+
+        // 如果有加载状态，加上进度条
+        Widget bubbleWithLoading = Stack(
+          children: [
+            bubbleContent,
+            if (isLoading)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: const LinearProgressIndicator(
+                    backgroundColor: Colors.transparent),
+              ),
+          ],
+        );
+
+        // 3. 根据判断结果返回不同的布局
+        if (isShortMessage) {
+          // 短消息：横向排列 [气泡, 间距, 按钮]
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment:
+                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end, // 底部对齐
+              children: [
+                if (isMe)
+                  widget.buildBottomButtons(
+                      widget.isSelected, message), // 我发的，按钮在流左侧
+                if (isMe) const SizedBox(width: 8),
+                Flexible(child: bubbleWithLoading),
+                if (!isMe) const SizedBox(width: 8),
+                if (!isMe)
+                  widget.buildBottomButtons(
+                      widget.isSelected, message), // 他发的，按钮在右侧
+              ],
             ),
-          ),
-      ],
+          );
+        } else {
+          // 长消息：保持原有的 Overlay 方案
+          return StickyOverlayContainer(
+            overlay: widget.buildBottomButtons(widget.isSelected, message),
+            alignment: Alignment.bottomLeft,
+            child: bubbleWithLoading,
+          );
+        }
+      },
     );
   }
 
@@ -827,9 +873,9 @@ class _MessageBubbleState extends State<MessageBubble> {
                                         thinkContent: thinkContent),
                                   // 主消息气泡
                                   _buildMessageBubbleBody(afterThink),
-                                  SizedBox(height: 8.0),
-                                  widget.buildBottomButtons(
-                                      widget.isSelected, message),
+                                  // SizedBox(height: 8.0),
+                                  // widget.buildBottomButtons(
+                                  //     widget.isSelected, message),
                                 ],
                               ),
                             ),
