@@ -67,19 +67,20 @@ class MessageModel {
   CharacterModel get sender =>
       CharacterController.of.getCharacterById(senderId);
 
-  MessageModel({
-    required this.id,
-    required this.content,
-    required this.senderId,
-    required this.time,
-    this.style = MessageStyle.common,
-    this.role = MessageRole.user,
-    this.token = 0,
-    this.resPath = const [],
-    this.visbility = MessageVisbility.common,
-    this.bookmark,
-    required this.alternativeContent,
-  });
+  MessageModel(
+      {required this.id,
+      required this.content,
+      required this.senderId,
+      required this.time,
+      this.style = MessageStyle.common,
+      this.role = MessageRole.user,
+      this.token = 0,
+      //this.resPath = const [],
+      this.visbility = MessageVisbility.common,
+      this.bookmark,
+      required this.alternativeContent,
+      List<String>? resPath})
+      : this.resPath = resPath ?? [];
 
   MessageModel.fromJson(Map<String, dynamic> json)
       : content = json['content'],

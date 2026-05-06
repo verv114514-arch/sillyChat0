@@ -639,95 +639,79 @@ class _MessageBubbleState extends State<MessageBubble> {
   Widget _buildMessageBubbleBody(String content) {
     final colors = Theme.of(context).colorScheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-
-        // 1. 计算/预估消息内容的宽度
-        // 这里可以根据字体大小粗略计算，或者使用更精确的 TextPainter
-        final textStyle = Theme.of(context).textTheme.bodyMedium;
-        final textPainter = TextPainter(
-          text: TextSpan(text: content, style: textStyle),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: maxWidth);
-
-        final contentWidth = textPainter.width + 24; // 24 是 padding (12*2)
-        final buttonWidth = 80.0; // 假设你的按钮 row 大约占用 80dp
-
-        // 2. 判断是否属于“短消息”：内容宽度 + 按钮宽度 < 总宽度
-        final bool isShortMessage = (contentWidth + buttonWidth) < maxWidth;
-
-        // 提取原始的气泡内容部分，避免重复代码
-        Widget bubbleContent = Container(
-          decoration: displaySetting.messageBubbleStyle ==
-                  MessageBubbleStyle.bubble
-              ? BoxDecoration(
-                  color: isMe
-                      ? colors.primary
-                      : (isDesktop ? colors.surface : colors.surfaceContainer),
-                  borderRadius: BorderRadius.circular(
-                      displaySetting.MessageBubbleBorderRadius),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                )
-              : null,
-          padding: const EdgeInsets.all(12),
-          child: _buildMessageContent(content),
-        );
-
-        // 如果有加载状态，加上进度条
-        Widget bubbleWithLoading = Stack(
-          children: [
-            bubbleContent,
-            if (isLoading)
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: const LinearProgressIndicator(
-                    backgroundColor: Colors.transparent),
+    return StickyOverlayContainer(
+      overlay: widget.buildBottomButtons(widget.isSelected, message),
+      alignment: isMe ? Alignment.bottomRight : Alignment.bottomLeft,
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        // 1. 强制子组件水平占满
+        width: double.infinity,
+        child: AnimatedPadding(
+          duration: Duration(milliseconds: 200),
+          curve: Curves.easeOutCirc,
+          padding: widget.isSelected
+              ? EdgeInsetsGeometry.only(bottom: 24)
+              : EdgeInsetsGeometry.zero,
+          child: Stack(
+            children: [
+              // 2. 使用 Align 确保气泡根据发送者身份靠左或靠右，且不被强制拉伸
+              Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: _buildBubbleSwitcher(content, colors),
               ),
-          ],
-        );
-
-        // 3. 根据判断结果返回不同的布局
-        if (isShortMessage) {
-          // 短消息：横向排列 [气泡, 间距, 按钮]
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment:
-                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.end, // 底部对齐
-              children: [
-                if (isMe)
-                  widget.buildBottomButtons(
-                      widget.isSelected, message), // 我发的，按钮在流左侧
-                if (isMe) const SizedBox(width: 8),
-                Flexible(child: bubbleWithLoading),
-                if (!isMe) const SizedBox(width: 8),
-                if (!isMe)
-                  widget.buildBottomButtons(
-                      widget.isSelected, message), // 他发的，按钮在右侧
-              ],
-            ),
-          );
-        } else {
-          // 长消息：保持原有的 Overlay 方案
-          return StickyOverlayContainer(
-            overlay: widget.buildBottomButtons(widget.isSelected, message),
-            alignment: Alignment.bottomLeft,
-            child: bubbleWithLoading,
-          );
-        }
-      },
+              if (isLoading)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: const LinearProgressIndicator(
+                    backgroundColor: Colors.transparent,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+
+// 提取气泡样式判断，保持代码整洁
+  Widget _buildBubbleSwitcher(String content, ColorScheme colors) {
+    if (displaySetting.messageBubbleStyle == MessageBubbleStyle.bubble) {
+      return Container(
+        decoration: BoxDecoration(
+          color: isMe
+              ? colors.primary
+              : isDesktop
+                  ? colors.surface
+                  : colors.surfaceContainer,
+          borderRadius:
+              BorderRadius.circular(displaySetting.MessageBubbleBorderRadius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(12),
+        child: _buildMessageContent(content),
+      );
+    } else if (displaySetting.messageBubbleStyle ==
+        MessageBubbleStyle.compact) {
+      return Column(
+        mainAxisSize: MainAxisSize.min, // 确保 Column 不纵向铺满
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          _buildMessageContent(content),
+          SizedBox(height: 16),
+        ],
+      );
+    } else {
+      return _buildMessageContent(content);
+    }
   }
 
   Widget _buildNarration() {

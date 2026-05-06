@@ -76,6 +76,46 @@ class VaultSettingController extends GetxController {
     await loadSettings();
   }
 
+  void addInitData() {
+    apis.addAll([
+      ApiModel(
+          id: 1,
+          apiKey: '',
+          displayName: 'displayName',
+          modelName: 'modelName',
+          url: 'url',
+          provider: ServiceType.deepseek),
+      ApiModel(
+          id: 2,
+          apiKey: '',
+          displayName: 'displayName',
+          modelName: 'modelName',
+          url: 'url',
+          provider: ServiceType.siliconflow),
+      ApiModel(
+          id: 3,
+          apiKey: '',
+          displayName: 'displayName',
+          modelName: 'modelName',
+          url: 'url',
+          provider: ServiceType.google),
+      ApiModel(
+          id: 4,
+          apiKey: '',
+          displayName: 'displayName',
+          modelName: 'modelName',
+          url: 'url',
+          provider: ServiceType.kimi),
+      ApiModel(
+          id: 5,
+          apiKey: '',
+          displayName: 'displayName',
+          modelName: 'modelName',
+          url: 'url',
+          provider: ServiceType.openai),
+    ]);
+  }
+
   // 从本地加载设置
   Future<void> loadSettings() async {
     try {
@@ -131,6 +171,7 @@ class VaultSettingController extends GetxController {
         // 文件不存在：证明初次启动
         isShowOnBoardPage.value = true;
         displaySettingModel.value = ChatDisplaySettingModel();
+        addInitData();
       }
 
       if (displaySettingModel.value.CustomFontPath != null &&
