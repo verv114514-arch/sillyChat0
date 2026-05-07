@@ -1,0 +1,69 @@
+class StoryModel {
+  String id;
+  String name;
+  String remark;
+  String story_prompt;
+  int? chatOptionId;
+  List<int> characterIds;
+  List<int> lorebookIds;
+  Map<String, dynamic> metaData;
+
+  StoryModel({
+    required this.id,
+    required this.name,
+    required this.remark,
+    required this.story_prompt,
+    this.chatOptionId,
+    this.characterIds = const [],
+    this.lorebookIds = const [],
+    this.metaData = const {},
+  });
+
+  factory StoryModel.fromJson(Map<String, dynamic> json) {
+    return StoryModel(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      remark: json['remark'] as String,
+      story_prompt: json['story_prompt'] as String,
+      chatOptionId: json['chatOptionId'] as int?,
+      characterIds: (json['characterIds'] as List<dynamic>?)?.cast<int>() ?? [],
+      lorebookIds: (json['lorebookIds'] as List<dynamic>?)?.cast<int>() ?? [],
+      metaData: json['metaData'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'remark': remark,
+      'story_prompt': story_prompt,
+      if (chatOptionId != null) 'chatOptionId': chatOptionId,
+      'characterIds': characterIds,
+      'lorebookIds': lorebookIds,
+      'metaData': metaData,
+    };
+  }
+
+  StoryModel copyWith({
+    String? id,
+    String? name,
+    String? remark,
+    String? story_prompt,
+    int? chatOptionId,
+    List<int>? characterIds,
+    List<int>? lorebookIds,
+    Map<String, dynamic>? metaData,
+  }) {
+    return StoryModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      remark: remark ?? this.remark,
+      story_prompt: story_prompt ?? this.story_prompt,
+      chatOptionId: chatOptionId ?? this.chatOptionId,
+      characterIds: characterIds ?? this.characterIds,
+      lorebookIds: lorebookIds ?? this.lorebookIds,
+      metaData: metaData ?? this.metaData,
+    );
+  }
+}

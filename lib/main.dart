@@ -15,6 +15,7 @@ import 'package:flutter_example/chat-app/providers/log_controller.dart';
 import 'package:flutter_example/chat-app/providers/lorebook_controller.dart';
 import 'package:flutter_example/chat-app/providers/prompt_controller.dart';
 import 'package:flutter_example/chat-app/providers/setting_controller.dart';
+import 'package:flutter_example/chat-app/providers/story_controller.dart';
 import 'package:flutter_example/chat-app/providers/vault_setting_controller.dart';
 import 'package:flutter_example/chat-app/test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
@@ -97,6 +98,7 @@ class SillyChatApp extends StatelessWidget {
   final LogController logs = Get.put(LogController());
   final ChatOptionController chatOptions = Get.put(ChatOptionController());
   final LoreBookController loreBooks = Get.put(LoreBookController());
+  final StoryController stories = Get.put(StoryController());
 
   static Future<void> restart() async {
     SettingController.vaultPath = await SettingController.of.getVaultPath();
@@ -123,6 +125,9 @@ class SillyChatApp extends StatelessWidget {
     await Get.find<ChatOptionController>().loadChatOptions();
     Get.find<LoreBookController>().lorebooks.value = [];
     await Get.find<LoreBookController>().loadLorebooks();
+
+    Get.find<StoryController>().stories.value = [];
+    await Get.find<StoryController>().loadStories();
   }
 
   static String getVersion() {

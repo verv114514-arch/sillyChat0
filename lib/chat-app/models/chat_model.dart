@@ -36,7 +36,7 @@ class ChatModel {
   int? userId;
   int? assistantId;
 
-  @Deprecated("已迁移到文件夹设置")
+  @Deprecated("已迁移")
   int? chatOptionId;
   List<MessageModel> messages = []; // 消息极有可能不按时间排列。
 
@@ -44,8 +44,6 @@ class ChatModel {
   List<int> characterIds = [];
   Map<String, String> chatVars = {};
 
-  // meta中的字段：
-  // readonly:是否为只读（归档）
   Map<String, dynamic> metaData = {};
   Map<String, bool> activitedLorebookItems = {}; // 手动激活的LorebookItem
 

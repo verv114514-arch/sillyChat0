@@ -13,6 +13,7 @@ import 'package:flutter_example/chat-app/pages/lorebooks/lorebook_manager.dart';
 import 'package:flutter_example/chat-app/pages/other/api_manager.dart';
 import 'package:flutter_example/chat-app/pages/other/api_selector.dart';
 import 'package:flutter_example/chat-app/pages/settings/setting_page.dart';
+import 'package:flutter_example/chat-app/pages/story/story_management_page.dart';
 import 'package:flutter_example/chat-app/pages/vault_manager.dart';
 import 'package:flutter_example/chat-app/providers/character_controller.dart';
 import 'package:flutter_example/chat-app/providers/chat_controller.dart';
@@ -63,6 +64,7 @@ class _MainPageMobileState extends State<MainPageMobile> {
     ContactsPage(
       scaffoldKey: _scaffoldKey,
     ),
+    StoryManagementPage(),
     // ChatOptionsManagerPage(
     //   scaffoldKey: _scaffoldKey,
     // ),
@@ -213,6 +215,7 @@ class _MainPageMobileState extends State<MainPageMobile> {
               BottomNavigationBarItem(
                   icon: Icon(Icons.chat_bubble), label: '聊天'),
               BottomNavigationBarItem(icon: Icon(Icons.people), label: '角色'),
+              BottomNavigationBarItem(icon: Icon(Icons.store_mall_directory), label: '故事'),
               BottomNavigationBarItem(icon: Icon(Icons.book), label: '世界书'),
               BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
             ],
