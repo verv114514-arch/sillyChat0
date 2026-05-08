@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_example/chat-app/models/story_model.dart';
 import 'package:flutter_example/chat-app/pages/story/story_form_page.dart';
+import 'package:flutter_example/chat-app/providers/chat_controller.dart';
 import 'package:flutter_example/chat-app/providers/story_controller.dart';
 import 'package:flutter_example/chat-app/utils/customNav.dart';
 import 'package:get/get.dart';
@@ -38,7 +39,8 @@ class StoryManagementPage extends GetView<StoryController> {
               story: story,
               colorScheme: colorScheme,
               onTap: () {
-                
+                ChatController.of.openStoryLatestChat(story);
+                Get.back();
                 // 预留：点击故事卡片的处理事件
               },
               onDelete: () => _confirmDelete(context, index),
@@ -162,7 +164,8 @@ class _StoryCard extends StatelessWidget {
                       children: [
                         Icon(Icons.delete_outline, color: colorScheme.error),
                         const SizedBox(width: 12),
-                        Text('删除故事', style: TextStyle(color: colorScheme.error)),
+                        Text('删除故事',
+                            style: TextStyle(color: colorScheme.error)),
                       ],
                     ),
                   ),

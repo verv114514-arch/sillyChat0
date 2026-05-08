@@ -58,9 +58,9 @@ class _MainPageMobileState extends State<MainPageMobile> {
 
   // Drawer内部切换的具体内容视图
   late List<Widget> _drawerContents = [
-    ChatManagePage(
-      scaffoldKey: _scaffoldKey,
-    ),
+    // ChatManagePage(
+    //   scaffoldKey: _scaffoldKey,
+    // ),
     ContactsPage(
       scaffoldKey: _scaffoldKey,
     ),
@@ -106,7 +106,7 @@ class _MainPageMobileState extends State<MainPageMobile> {
     return Tooltip(
       message: "设置API",
       child: InkWell(
-        onTap: () async { 
+        onTap: () async {
           ModelSelectionResult? result = await customNavigate(
               ApiModelSelectionPage(
                 apiList: VaultSettingController.of().apis.value,
@@ -212,10 +212,11 @@ class _MainPageMobileState extends State<MainPageMobile> {
             backgroundColor: Colors.transparent,
             type: BottomNavigationBarType.fixed,
             items: [
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.chat_bubble), label: '聊天'),
+              // BottomNavigationBarItem(
+              //     icon: Icon(Icons.chat_bubble), label: '聊天'),
               BottomNavigationBarItem(icon: Icon(Icons.people), label: '角色'),
-              BottomNavigationBarItem(icon: Icon(Icons.store_mall_directory), label: '故事'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.store_mall_directory), label: '故事'),
               BottomNavigationBarItem(icon: Icon(Icons.book), label: '世界书'),
               BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
             ],

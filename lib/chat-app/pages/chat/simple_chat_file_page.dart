@@ -61,8 +61,8 @@ class _SimpleChatFilesPageState extends State<SimpleChatFilesPage> {
       }
 
       // 按修改时间降序排序（最新的在前）
-      fileStats.sort(
-          (a, b) => (b['modified'] as DateTime).compareTo(a['modified'] as DateTime));
+      fileStats.sort((a, b) =>
+          (b['modified'] as DateTime).compareTo(a['modified'] as DateTime));
       files.addAll(fileStats.map((e) => e['file'] as File));
     } catch (e) {
       if (mounted) {
@@ -98,7 +98,7 @@ class _SimpleChatFilesPageState extends State<SimpleChatFilesPage> {
     if (!SillyChatApp.isDesktop()) {
       Get.back();
     }
-    ChatController.of.currentChat.value = ChatSessionController(path);
+    ChatController.of.openChat(path);
   }
 
   /// 删除选中的文件（带确认对话框）
@@ -152,13 +152,9 @@ class _SimpleChatFilesPageState extends State<SimpleChatFilesPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [_buildAppBar(theme)];
-          },
-          body: _buildFileList(theme),
-        ),
+        backgroundColor: theme.colorScheme.surface,
+        appBar: _buildAppBar(theme),
+        body: _buildFileList(theme),
       ),
     );
   }
@@ -166,7 +162,7 @@ class _SimpleChatFilesPageState extends State<SimpleChatFilesPage> {
   /// 构建 AppBar（多选模式与非多选模式）
   PreferredSizeWidget _buildAppBar(ThemeData theme) {
     if (_isMultiSelectMode) {
-      return InnerAppBar(
+      return AppBar(
         title: Text(
           '${_selectedFiles.length} 已选择',
           style: theme.textTheme.titleSmall,
@@ -188,9 +184,10 @@ class _SimpleChatFilesPageState extends State<SimpleChatFilesPage> {
         ],
       );
     } else {
-      return InnerAppBar(
+      return AppBar(
         title: Text(
-          path.basename(_directory.path),
+          '查看历史话题',
+          //path.basename(_directory.path),
           style: theme.textTheme.titleMedium,
         ),
       );

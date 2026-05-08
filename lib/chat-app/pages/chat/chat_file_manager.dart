@@ -267,7 +267,8 @@ class _FileManagerWidgetState extends State<FileManagerWidget> {
     if (!SillyChatApp.isDesktop()) {
       Get.back();
     }
-    ChatController.of.currentChat.value = ChatSessionController(path);
+
+    ChatController.of.openChat(path);
   }
 
   @override

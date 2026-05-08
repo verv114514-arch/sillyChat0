@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_example/chat-app/pages/character/edit_character_page.dart';
+import 'package:flutter_example/chat-app/pages/character/profile_page.dart';
 import 'package:flutter_example/chat-app/providers/character_controller.dart';
 import 'package:flutter_example/chat-app/utils/customNav.dart';
 import 'package:flutter_example/chat-app/utils/image_utils.dart';
@@ -12,8 +13,10 @@ import 'package:flutter_example/chat-app/widgets/inner_app_bar.dart';
 import 'package:get/get.dart';
 import '../../models/character_model.dart';
 
+// 定义三种显示模式
+enum CharacterViewMode { list, card, grid }
+
 class ContactsPage extends StatefulWidget {
-  // 顶级菜单的key，用于控制侧边栏
   final GlobalKey<ScaffoldState>? scaffoldKey;
   const ContactsPage({Key? key, this.scaffoldKey}) : super(key: key);
 
@@ -23,17 +26,17 @@ class ContactsPage extends StatefulWidget {
 
 class _ContactsPageState extends State<ContactsPage> {
   final Map<String, bool> _expandedState = {};
-  bool _isSortingMode = false; // 控制排序模式
   final characterController = Get.find<CharacterController>();
 
-  // 新增：搜索控制器和响应式字符串
   final TextEditingController _searchController = TextEditingController();
   final RxString _searchText = ''.obs;
+
+  // 当前视图模式，默认列表
+  CharacterViewMode _viewMode = CharacterViewMode.list;
 
   @override
   void initState() {
     super.initState();
-    // 监听搜索框文本变化
     _searchController.addListener(() {
       _searchText.value = _searchController.text;
     });
@@ -41,13 +44,12 @@ class _ContactsPageState extends State<ContactsPage> {
 
   @override
   void dispose() {
-    _searchController.dispose(); // 释放控制器
+    _searchController.dispose();
     super.dispose();
   }
 
-  // 处理搜索过滤后的分组
+  // 搜索和分组逻辑
   Map<String, List<CharacterModel>> get _filteredAndGroupedContacts {
-    // 如果搜索框为空，返回所有分组
     if (_searchText.value.isEmpty) {
       return characterController.characters
           .fold(<String, List<CharacterModel>>{}, (map, contact) {
@@ -58,7 +60,6 @@ class _ContactsPageState extends State<ContactsPage> {
         return map;
       });
     } else {
-      // 如果有搜索文本，过滤后再分组
       final filteredContacts = characterController.characters
           .where((contact) =>
               contact.roleName
@@ -73,7 +74,6 @@ class _ContactsPageState extends State<ContactsPage> {
 
       return filteredContacts.fold(<String, List<CharacterModel>>{},
           (map, contact) {
-        // 即使搜索，也保持分组逻辑，但只显示包含搜索词的组
         if (!map.containsKey(contact.category)) {
           map[contact.category] = [];
         }
@@ -83,306 +83,373 @@ class _ContactsPageState extends State<ContactsPage> {
     }
   }
 
-  // 分组模式的视图 (根据搜索结果调整)
-  Iterable<Column> _groupedContactsWidget(BuildContext context) {
-    final theme = Theme.of(context);
-    final groupedContacts = _filteredAndGroupedContacts;
-
-    // 如果搜索结果为空，显示提示
-    if (groupedContacts.isEmpty && _searchText.value.isNotEmpty) {
-      return [
-        Column(
-          children: [
-            const SizedBox(height: 50),
-            Icon(Icons.search_off, size: 60, color: theme.colorScheme.outline),
-            const SizedBox(height: 16),
-            Text('未找到匹配的角色',
-                style: theme.textTheme.bodyLarge
-                    ?.copyWith(color: theme.colorScheme.outline)),
-          ],
-        ),
-      ];
-    }
-
-    return groupedContacts.entries.map((entry) {
-      // 确保每个组在 _expandedState 中有状态，默认展开
-      _expandedState.putIfAbsent(entry.key, () => true);
-      return Column(
-        children: [
-          // 分组标题 (搜索时可能总是展开)
-          ListTile(
-            title: Text(
-              "${entry.key} (${entry.value.length})",
-              style: TextStyle(
-                color: theme.colorScheme.outline,
-                fontSize: 14,
-              ),
-            ),
-            trailing: _searchText.value.isEmpty // 搜索时隐藏展开图标
-                ? AnimatedRotation(
-                    turns: _expandedState[entry.key]! ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.fastOutSlowIn,
-                    child: const Icon(Icons.expand_more),
-                  )
-                : null,
-            onTap: _searchText.value.isEmpty // 搜索时禁用标题点击
-                ? () {
-                    setState(() {
-                      _expandedState[entry.key] = !_expandedState[entry.key]!;
-                    });
-                  }
-                : null,
-          ),
-          // 分组内容
-          if (_searchText.value.isNotEmpty || _expandedState[entry.key]!)
-            ClipRect(
-              child: AnimatedSize(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-                alignment: Alignment.topCenter,
-                child: Column(
-                  children: entry.value
-                      .map((contact) => _contractWidget(context, contact))
-                      .toList(),
-                ),
-              ),
-            ),
-        ],
-      );
-    });
-  }
-
-  // 排序模式的视图 (根据搜索结果调整)
-  Widget _reorderableListWidget(BuildContext context) {
-    List<CharacterModel> itemsToDisplay;
-    if (_searchText.value.isEmpty) {
-      itemsToDisplay = characterController.characters;
-    } else {
-      itemsToDisplay = characterController.characters
-          .where((contact) =>
-              contact.roleName
-                  .toLowerCase()
-                  .contains(_searchText.value.toLowerCase()) ||
-              contact.category
-                  .toLowerCase()
-                  .contains(_searchText.value.toLowerCase()) ||
-              (contact.brief?.toLowerCase() ?? '')
-                  .contains(_searchText.value.toLowerCase()))
-          .toList();
-    }
-
-    // 如果搜索结果为空且处于排序模式
-    if (itemsToDisplay.isEmpty && _searchText.value.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off,
-                size: 60, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 16),
-            Text('未找到匹配的角色',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(color: Theme.of(context).colorScheme.outline)),
-          ],
-        ),
-      );
-    }
-
-    return ReorderableListView.builder(
-      itemCount: itemsToDisplay.length,
-      itemBuilder: (context, index) {
-        final contact = itemsToDisplay[index];
-        return Container(
-          key: ValueKey(contact.id),
-          child: _contractWidget(context, contact),
-        );
-      },
-      onReorder: (int oldIndex, int newIndex) {
-        // 注意：搜索模式下的排序可能需要更复杂的逻辑来映射回原始列表
-        // 这里简化处理：只在未搜索时允许排序原始列表
-        if (_searchText.value.isNotEmpty) {
-          // 如果在搜索结果中排序，只更新 itemsToDisplay 的顺序（不会影响原始数据）
-          // 或者禁用搜索时的排序
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请先清除搜索以对所有角色进行排序')),
-          );
-          return;
-        }
-
-        setState(() {
-          if (oldIndex < newIndex) {
-            newIndex -= 1;
-          }
-          final character = characterController.characters.removeAt(oldIndex);
-          characterController.characters.insert(newIndex, character);
-        });
-      },
-    );
-  }
-
-// 这是一个新的辅助方法，用于显示新增角色的对话框
   void _showAddCharacterDialog(BuildContext context) {
     customNavigate(const EditCharacterPage(), context: context);
   }
 
-  ListTile _contractWidget(BuildContext context, CharacterModel contact) {
+  // 获取模式切换按钮的图标
+  IconData _getViewModeIcon() {
+    switch (_viewMode) {
+      case CharacterViewMode.list:
+        return Icons.view_agenda_rounded; // 提示下一个是卡片模式
+      case CharacterViewMode.card:
+        return Icons.grid_view_rounded; // 提示下一个是大卡片网格模式
+      case CharacterViewMode.grid:
+        return Icons.view_list_rounded; // 提示下一个是列表模式
+    }
+  }
+
+  // 1. 列表式 Item
+  Widget _buildListTile(BuildContext context, CharacterModel contact) {
     return ListTile(
-      leading: Stack(
-        children: [
-          CircleAvatar(
-            backgroundImage: ImageUtils.getProvider(contact.avatar),
-            radius: 29,
-          ),
-        ],
+      leading: CircleAvatar(
+        backgroundImage: ImageUtils.getProvider(contact.avatar),
+        radius: 24.0,
       ),
-      trailing: _isSortingMode
-          ? const Icon(Icons.drag_handle) // 排序模式下显示拖拽图标
-          : null,
-      // IconButton(
-      //   onPressed: () {
-      //     customNavigate(PersonalPage(character: contact),
-      //         context: context);
-      //   },
-      //   icon: Icon(Icons.chevron_right)),
       title: Text(contact.roleName),
       subtitle: contact.brief != null
           ? Text(
               contact.brief!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.outline,
-              ),
+              style: TextStyle(color: Theme.of(context).colorScheme.outline),
               maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             )
           : null,
       onTap: () {
-        // 排序模式下禁用点击事件
-        if (_isSortingMode) return;
-        customNavigate(EditCharacterPage(characterId: contact.id),
-            context: context);
+        customNavigate(ProfilePage(character: contact), context: context);
       },
     );
+  }
+
+  // 2. 卡片式 Item
+  Widget _buildCardTile(BuildContext context, CharacterModel contact) {
+    final theme = Theme.of(context);
+    final bgImage = contact.backgroundImage ?? contact.avatar;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
+      elevation: 2.0,
+      child: InkWell(
+        onTap: () {
+          customNavigate(ProfilePage(character: contact), context: context);
+        },
+        child: Container(
+          height: 140.0,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: ImageUtils.getProvider(bgImage),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black26, Colors.black87],
+              ),
+            ),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  contact.roleName,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold),
+                ),
+                if (contact.brief != null) ...[
+                  const SizedBox(height: 4.0),
+                  Text(
+                    contact.brief!,
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 13.0),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const Spacer(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        // TODO: 预留编辑方法
+                      },
+                      icon: const Icon(Icons.edit,
+                          size: 18.0, color: Colors.white),
+                      label: const Text('编辑',
+                          style: TextStyle(color: Colors.white)),
+                      style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact),
+                    ),
+                    const SizedBox(width: 8.0),
+                    FilledButton.icon(
+                      onPressed: () {
+                        // TODO: 预留聊天方法
+                      },
+                      icon: const Icon(Icons.chat, size: 18.0),
+                      label: const Text('聊天'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 3. 大卡片式 Item
+  Widget _buildGridTile(BuildContext context, CharacterModel contact) {
+    final bgImage = contact.backgroundImage ?? contact.avatar;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
+      elevation: 2.0,
+      child: InkWell(
+        onTap: () {
+          customNavigate(ProfilePage(character: contact), context: context);
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: ImageUtils.getProvider(bgImage),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black87],
+              ),
+            ),
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  contact.roleName,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15.0),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (contact.brief != null) ...[
+                  const SizedBox(height: 4.0),
+                  Text(
+                    contact.brief!,
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12.0),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 根据当前模式构建内容视图
+  Widget _buildContentForMode(
+      BuildContext context, List<CharacterModel> contacts) {
+    switch (_viewMode) {
+      case CharacterViewMode.list:
+        return Column(
+          children: contacts.map((c) => _buildListTile(context, c)).toList(),
+        );
+      case CharacterViewMode.card:
+        return Column(
+          children: contacts.map((c) => _buildCardTile(context, c)).toList(),
+        );
+      case CharacterViewMode.grid:
+        return GridView.builder(
+          primary: false, // 强制声明为非主滚动视图，极其重要！防止与外层 ListView 冲突
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(), // 完全交出滚动权
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12.0, // 强制指定 .0 为 double 类型，避免旧版类型报错
+            mainAxisSpacing: 12.0,
+            childAspectRatio: 0.8,
+          ),
+          itemCount: contacts.length,
+          itemBuilder: (context, index) =>
+              _buildGridTile(context, contacts[index]),
+        );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-        floatingActionButton: Obx(() => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (CharacterController.of.characterCilpBoard.value != null)
-                  FloatingActionButton(
-                    heroTag: 'paste_character',
-                    onPressed: () {
-                      characterController.addCharacter(
-                          characterController.characterCilpBoard.value!);
-                      // setState() is likely needed here to reflect the change
-                      setState(() {
-                        characterController.characterCilpBoard.value = null;
-                      });
-                    },
-                    tooltip: '粘贴角色',
-                    child: const Icon(Icons.paste),
-                  ),
-                SizedBox(
-                  height: 16,
-                ),
+      floatingActionButton: Obx(() => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (CharacterController.of.characterCilpBoard.value != null)
                 FloatingActionButton(
+                  heroTag: 'paste_character',
                   onPressed: () {
-                    // 点击按钮时，调用函数显示对话框
-                    _showAddCharacterDialog(context);
+                    characterController.addCharacter(
+                        characterController.characterCilpBoard.value!);
+                    setState(() {
+                      characterController.characterCilpBoard.value = null;
+                    });
                   },
-                  tooltip: '新增角色',
-                  child: const Icon(Icons.add),
+                  tooltip: '粘贴角色',
+                  child: const Icon(Icons.paste),
                 ),
-              ],
-            )),
-        backgroundColor: Colors.transparent,
-        // 使用 AppBar
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              InnerAppBar(
-                title: Container(
-                  height: 40, // 设置一个合适的高度
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface, // 背景色匹配原来的设计
-                    borderRadius: BorderRadius.circular(20.0), // 圆角
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: '搜索角色',
-                      hintStyle:
-                          TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: theme.colorScheme.onSurfaceVariant,
-                        size: 20, // 调整图标大小
-                      ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minHeight: 32, minWidth: 32, // 调整图标约束
-                      ),
-                      // 移除默认边框和填充，使用 Container 的装饰
-                      // border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10, horizontal: 12),
-                      // 可选：添加清除按钮
-                      suffixIcon: _searchText.value.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear,
-                                  size: 20,
-                                  color: theme.colorScheme.onSurfaceVariant),
-                              onPressed: () {
-                                _searchController.clear();
-                                _searchText.value = '';
-                              },
-                            )
-                          : null,
+              const SizedBox(height: 16.0),
+              FloatingActionButton(
+                onPressed: () => _showAddCharacterDialog(context),
+                tooltip: '新增角色',
+                child: const Icon(Icons.add),
+              ),
+            ],
+          )),
+      backgroundColor: Colors.transparent,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            InnerAppBar(
+              title: Container(
+                height: 40.0,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '搜索角色',
+                    hintStyle:
+                        TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20.0,
                     ),
-                    style: TextStyle(color: theme.colorScheme.onSurface),
-                    cursorColor: theme.colorScheme.primary,
+                    prefixIconConstraints: const BoxConstraints(
+                      minHeight: 32.0,
+                      minWidth: 32.0,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 10.0, horizontal: 12.0),
+                    border: InputBorder.none, // 移除下划线
+                    suffixIcon: _searchText.value.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear,
+                                size: 20.0,
+                                color: theme.colorScheme.onSurfaceVariant),
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchText.value = '';
+                            },
+                          )
+                        : null,
                   ),
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                  cursorColor: theme.colorScheme.primary,
                 ),
-                // AppBar 操作区域放置按钮
-                actions: [
-                  // 排序模式切换按钮
+              ),
+              actions: [
+                // 视图模式切换按钮
+                IconButton(
+                  icon: Icon(_getViewModeIcon(),
+                      color: theme.colorScheme.onSurface),
+                  onPressed: () {
+                    setState(() {
+                      // 循环切换视图模式
+                      _viewMode = CharacterViewMode.values[
+                          (_viewMode.index + 1) %
+                              CharacterViewMode.values.length];
+                    });
+                  },
+                  tooltip: '切换显示模式',
+                ),
+                const SizedBox(width: 8.0),
+              ],
+            ),
+          ];
+        },
+        body: Obx(() {
+          final groupedContacts = _filteredAndGroupedContacts;
+          final isSearching = _searchText.value.isNotEmpty;
 
-                  IconButton(
-                    icon: Icon(_isSortingMode ? Icons.check : Icons.sort,
-                        color: theme.colorScheme.onSurface),
-                    onPressed: () {
-                      setState(() {
-                        _isSortingMode = !_isSortingMode;
-                      });
-                    },
-                    tooltip: _isSortingMode ? '完成排序' : '进入排序', // 添加提示
-                  ),
-
-
-                  const SizedBox(width: 8), // 右边距
+          if (groupedContacts.isEmpty && isSearching) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search_off,
+                      size: 60.0, color: theme.colorScheme.outline),
+                  const SizedBox(height: 16.0),
+                  Text('未找到匹配的角色',
+                      style: theme.textTheme.bodyLarge
+                          ?.copyWith(color: theme.colorScheme.outline)),
                 ],
               ),
-            ];
-          },
-          body: Obx(() {
-            // 根据是否为排序模式来决定显示哪个视图
-            if (_isSortingMode) {
-              return _reorderableListWidget(context);
-            } else {
-              return ListView(
-                children: [
-                  ..._groupedContactsWidget(context),
-                ],
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80.0), // 防止FAB挡住最后的内容
+            itemCount: groupedContacts.length,
+            itemBuilder: (context, index) {
+              final entry = groupedContacts.entries.elementAt(index);
+              final groupKey = entry.key;
+              final contacts = entry.value;
+
+              final isExpanded =
+                  isSearching || (_expandedState[groupKey] ?? true);
+
+              return Theme(
+                data: theme.copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: PageStorageKey('${groupKey}_$isSearching'),
+                  initiallyExpanded: isExpanded,
+                  onExpansionChanged: (expanded) {
+                    if (!isSearching) {
+                      _expandedState[groupKey] = expanded;
+                    }
+                  },
+                  title: Text(
+                    "$groupKey (${contacts.length})",
+                    style: TextStyle(
+                      color: theme.colorScheme.outline,
+                      fontSize: 14.0,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  children: [
+                    _buildContentForMode(context, contacts),
+                  ],
+                ),
               );
-            }
-          }),
-        )
-        // 移除原来的 floatingActionButton
-        // floatingActionButton: ...
-        );
+            },
+          );
+        }),
+      ),
+    );
   }
 }

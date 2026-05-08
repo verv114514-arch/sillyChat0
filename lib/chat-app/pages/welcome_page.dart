@@ -68,7 +68,9 @@ class _WelcomePageState extends State<WelcomePage>
   }
 
   void onTapChat(String path) {
-    GotoChat.byPath(path);
+    ChatController.of.openChat(path);
+
+    //GotoChat.byPath(path);
   }
 
   void gotoCreateChat() async {

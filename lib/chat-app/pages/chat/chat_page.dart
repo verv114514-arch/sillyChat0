@@ -14,6 +14,7 @@ import 'package:flutter_example/chat-app/pages/chat/edit_chat.dart';
 import 'package:flutter_example/chat-app/pages/chat/edit_message.dart';
 import 'package:flutter_example/chat-app/pages/chat/manage_message_page.dart';
 import 'package:flutter_example/chat-app/pages/chat/message_optimization_page.dart';
+import 'package:flutter_example/chat-app/pages/chat/simple_chat_file_page.dart';
 import 'package:flutter_example/chat-app/pages/welcome_page.dart';
 import 'package:flutter_example/chat-app/providers/chat_session_controller.dart';
 import 'package:flutter_example/chat-app/providers/lorebook_controller.dart';
@@ -702,7 +703,7 @@ class _ChatPageState extends State<ChatPage> {
     // 简单的复制聊天方法
     final fp =
         await ChatController.of.createChat(newChat, p.dirname(chat.file!.path));
-    ChatController.of.currentChat.value = ChatSessionController(fp);
+    ChatController.of.openChat(fp);
   }
 
   void _genMemory() async {
@@ -1036,6 +1037,14 @@ class _ChatPageState extends State<ChatPage> {
       ),
       actions: [
         IconButton(
+            onPressed: () {
+              customNavigate(
+                  SimpleChatFilesPage(
+                      directoryPath: p.dirname(chat.file?.path ?? '')),
+                  context: context);
+            },
+            icon: Icon(Icons.history)),
+        IconButton(
           icon: const Icon(Icons.search),
           onPressed: () {
             customNavigate(
@@ -1074,7 +1083,8 @@ class _ChatPageState extends State<ChatPage> {
           });
 
           if (path != null && path.isNotEmpty) {
-            GotoChat.byPath(path);
+            //GotoChat.byPath(path);
+            ChatController.of.openChat(path);
           }
         } else if (value == 'search') {
           customNavigate(

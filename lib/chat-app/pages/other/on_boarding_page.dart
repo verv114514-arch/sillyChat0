@@ -7,7 +7,6 @@ import 'package:flutter_example/chat-app/models/api_model.dart';
 import 'package:flutter_example/chat-app/models/character_model.dart';
 import 'package:flutter_example/chat-app/models/chat_option_model.dart';
 import 'package:flutter_example/chat-app/pages/other/api_edit.dart';
-import 'package:flutter_example/chat-app/pages/other/api_manager.dart';
 import 'package:flutter_example/chat-app/providers/character_controller.dart';
 import 'package:flutter_example/chat-app/providers/chat_option_controller.dart';
 import 'package:flutter_example/chat-app/providers/setting_controller.dart';
@@ -483,7 +482,7 @@ class _OnBoardingPageState extends State<OnBoardingPage> {
           ),
           PageViewModel(
             titleWidget: _buildTitleWidget("连接你的API", "将来这里会有一个测试通信功能"),
-            bodyWidget: ApiManagerPage(), //_buildApiPage(),
+            bodyWidget: _buildApiPage(),
             decoration: _buildPageDecoration(),
           ),
           PageViewModel(

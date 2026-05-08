@@ -71,10 +71,6 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  void desktop_switchChat(String path) {
-    _chatController.currentChat.value = ChatSessionController(path);
-  }
-
   String getSizeString(int byteSize) {
     if (byteSize < 1024) {
       return '$byteSize B';

@@ -5,9 +5,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_example/chat-app/constants.dart';
 import 'package:flutter_example/chat-app/events.dart';
+import 'package:flutter_example/chat-app/models/character_model.dart';
 import 'package:flutter_example/chat-app/models/chat_metadata_model.dart';
 import 'package:flutter_example/chat-app/models/folder_setting_model.dart';
 import 'package:flutter_example/chat-app/models/message_model.dart';
+import 'package:flutter_example/chat-app/models/story_model.dart';
+import 'package:flutter_example/chat-app/pages/chat/chat_page.dart';
 import 'package:flutter_example/chat-app/providers/character_controller.dart';
 import 'package:flutter_example/chat-app/providers/chat_session_controller.dart';
 import 'package:flutter_example/chat-app/providers/setting_controller.dart';
@@ -203,10 +206,8 @@ class ChatController extends GetxController {
       }
     });
 
-    if(bestKey==null){
-      return (
-        null,null,null
-      );
+    if (bestKey == null) {
+      return (null, null, null);
     }
 
     return (
@@ -349,6 +350,60 @@ class ChatController extends GetxController {
     await createChat(chatModel, path);
 
     return chatModel;
+  }
+
+  void openChat(String path) {
+    currentChat.value = ChatSessionController(path);
+  }
+
+  // 打开某角色的最新聊天，不存在则创建
+  void openCharacterLatestChat(CharacterModel character) async {
+    String path = p.join(SettingController.of.getChatPathSync(), 'roles',
+        character.id.toString());
+    final dir = Directory(path);
+    if (!dir.existsSync()) {
+      dir.createSync(recursive: true);
+    }
+
+    final files = dir.listSync().whereType<File>().map((file) {
+      final modified = file.statSync().modified;
+      return MapEntry(file, modified);
+    }).toList();
+
+    if (files.isEmpty) {
+      final chat = ChatModel.empty().copyWith(assistantId: character.id);
+      final fp = await createChat(chat, path);
+      openChat(fp);
+    } else {
+      files.sort((a, b) => b.value.compareTo(a.value));
+      final file = files.first.key;
+      openChat(file.path);
+    }
+  }
+
+  // 打开某故事的最新聊天，不存在则创建
+  void openStoryLatestChat(StoryModel story) async {
+    String path = p.join(
+        SettingController.of.getChatPathSync(), 'stories', story.id.toString());
+    final dir = Directory(path);
+    if (!dir.existsSync()) {
+      dir.createSync(recursive: true);
+    }
+
+    final files = dir.listSync().whereType<File>().map((file) {
+      final modified = file.statSync().modified;
+      return MapEntry(file, modified);
+    }).toList();
+
+    if (files.isEmpty) {
+      final chat = ChatModel.empty().copyWith(mode: ChatMode.group);
+      final fp = await createChat(chat, path);
+      openChat(fp);
+    } else {
+      files.sort((a, b) => b.value.compareTo(a.value));
+      final file = files.first.key;
+      openChat(file.path);
+    }
   }
 
   static ChatController get of => Get.find<ChatController>();
