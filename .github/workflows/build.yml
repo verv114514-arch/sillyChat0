@@ -22,7 +22,7 @@ jobs:
       - name: 设置 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'  # 请根据您的项目修改版本
+          flutter-version: '3.27.4'  # 更新为符合 SDK ^3.5.4 的版本
           channel: 'stable'
 
       - name: 安装依赖
@@ -51,7 +51,7 @@ jobs:
       - name: 设置 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'  # 请根据您的项目修改版本
+          flutter-version: '3.27.4'  # 更新为符合 SDK ^3.5.4 的版本
           channel: 'stable'
 
       - name: 启用 Windows 桌面支持
@@ -73,7 +73,6 @@ jobs:
           path: build/windows/x64/runner/Release/
           retention-days: 30
 
-  # 可选：创建一个合并所有构件的作业
   create-release:
     name: 创建发布
     needs: [build-android, build-windows]
