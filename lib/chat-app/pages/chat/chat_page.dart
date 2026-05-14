@@ -159,6 +159,8 @@ class _ChatPageState extends State<ChatPage> {
     //   });
     // };
 
+
+    /*
     sessionController.onAIStateUpdate = () {
       final shouldStickToBottom = isNearBottom;
       // 更新前的数据
@@ -180,6 +182,17 @@ class _ChatPageState extends State<ChatPage> {
               ),
             );
           }
+        }
+      });
+    };*/
+
+
+    sessionController.onAIStateUpdate = () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        // 只有在用户没有手动上滑查看历史时，才自动滚到底部
+        if (!_isUserReading) {
+          _scrollController.jumpTo(0);
         }
       });
     };
