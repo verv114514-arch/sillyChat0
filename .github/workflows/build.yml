@@ -5,10 +5,10 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: '3.19.0'  # 请根据你的项目修改 Flutter 版本
+  FLUTTER_VERSION: '3.24.0'  # 更新为更高版本，对应 Dart SDK >= 3.5.4
   OUTPUT_DIR: build_output
 
 jobs:
