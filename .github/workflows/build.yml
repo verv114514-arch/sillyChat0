@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 设置自定义的 Android 用户目录，保证可写
+    env:
+      ANDROID_USER_HOME: ${{ github.workspace }}/android_user_home
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,28 +30,41 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # 删除本地 Windows 路径配置（在 Linux 构建机无效）
       - name: Remove invalid java.home from gradle.properties
         run: sed -i '/org.gradle.java.home/d' android/gradle.properties
 
+      # 自动接受所有 SDK 许可证
       - name: Accept Android SDK licenses
         run: |
           yes | sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
         continue-on-error: true
 
+      # 安装项目所需的 NDK 版本
       - name: Install NDK 29.0.13113456
         run: |
           sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "ndk;29.0.13113456"
 
+      # 创建可写的 Android 用户目录（用于存放 debug.keystore）
+      - name: Setup Android user home directory
+        run: |
+          mkdir -p $ANDROID_USER_HOME
+          chmod 777 $ANDROID_USER_HOME
+
+      # 安装 Flutter 依赖
       - name: Install dependencies
         run: flutter pub get
 
+      # 运行代码生成器（可选，失败继续）
       - name: Run build_runner (optional)
         run: flutter pub run build_runner build --delete-conflicting-outputs
         continue-on-error: true
 
+      # 构建 APK（仅 arm64 架构）
       - name: Build APK (android-arm64)
         run: flutter build apk --release --target-platform android-arm64
 
+      # 上传 APK 作为 Artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
