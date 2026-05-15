@@ -25,10 +25,9 @@ jobs:
         with:
           channel: 'stable'
           cache: true
-          # 不指定具体版本，自动使用最新稳定版（当前最新稳定版为 3.27.4，Dart 3.6.0）
 
-      - name: Check Dart & Flutter version
-        run: flutter --version
+      - name: Remove invalid java.home from gradle.properties
+        run: sed -i '/org.gradle.java.home/d' android/gradle.properties
 
       - name: Install dependencies
         run: flutter pub get
