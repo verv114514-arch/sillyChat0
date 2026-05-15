@@ -1,40 +1,50 @@
-name: Flutter 一键构建 (Android APK + Windows EXE)
+name: Flutter Build (Android APK + Windows EXE)
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   workflow_dispatch:  # 允许手动触发
+
+env:
+  FLUTTER_VERSION: '3.19.0'  # 请根据你的项目修改 Flutter 版本
+  OUTPUT_DIR: build_output
 
 jobs:
   build-android:
-    name: 构建 Android APK
+    name: Build Android APK
     runs-on: ubuntu-latest
     steps:
-      - name: 检出代码
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 设置 Flutter
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.5.4'  # 更新为符合 SDK ^3.5.4 的版本
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
-      - name: 安装依赖
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Get dependencies
         run: flutter pub get
 
-      - name: 清理项目
+      - name: Clean project
         run: flutter clean
 
-      - name: 构建 Android APK (Release)
+      - name: Build Android APK (Release)
         run: flutter build apk --release
 
-      - name: 上传 APK 制品
+      - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -42,63 +52,92 @@ jobs:
           retention-days: 30
 
   build-windows:
-    name: 构建 Windows EXE
+    name: Build Windows EXE
     runs-on: windows-latest
     steps:
-      - name: 检出代码
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 设置 Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.5.4'  # 更新为符合 SDK ^3.5.4 的版本
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
-      - name: 启用 Windows 桌面支持
+      - name: Enable Windows desktop support
         run: flutter config --enable-windows-desktop
 
-      - name: 安装依赖
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Get dependencies
         run: flutter pub get
 
-      - name: 清理项目
+      - name: Clean project
         run: flutter clean
 
-      - name: 构建 Windows EXE (Release)
+      - name: Build Windows EXE (Release)
         run: flutter build windows --release
 
-      - name: 上传 Windows 构建制品
+      - name: Create output directory
+        run: |
+          if (Test-Path $env:OUTPUT_DIR) { Remove-Item -Recurse -Force $env:OUTPUT_DIR }
+          New-Item -ItemType Directory -Force -Path $env:OUTPUT_DIR
+
+      - name: Copy Windows build artifacts
+        run: |
+          Copy-Item -Recurse -Force "build\windows\x64\runner\Release\*" "$env:OUTPUT_DIR\Windows_App\"
+
+      - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-app
-          path: build/windows/x64/runner/Release/
+          name: windows-exe
+          path: ${{ env.OUTPUT_DIR }}/Windows_App
           retention-days: 30
 
-  create-release:
-    name: 创建发布
+  build-and-package-all:
+    name: Package All Builds
     needs: [build-android, build-windows]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
-      - name: 下载 Android APK
+      - name: Download Android APK
         uses: actions/download-artifact@v4
         with:
           name: android-apk
+          path: ${{ env.OUTPUT_DIR }}
 
-      - name: 下载 Windows 应用
+      - name: Download Windows EXE
         uses: actions/download-artifact@v4
         with:
-          name: windows-app
+          name: windows-exe
+          path: ${{ env.OUTPUT_DIR }}/Windows_App
 
-      - name: 压缩 Windows 应用
-        run: zip -r windows-app.zip windows-app/
+      - name: Create combined archive
+        run: |
+          cd ${{ env.OUTPUT_DIR }}
+          zip -r ../flutter-builds.zip .
+          cd ..
 
-      - name: 创建 GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
-          files: |
-            app-release.apk
-            windows-app.zip
+          name: Build ${{ github.run_number }}
+          tag_name: build-${{ github.run_number }}
+          body: |
+            ## 🔨 自动构建产物
+            
+            **构建编号:** ${{ github.run_number }}
+            **分支:** ${{ github.ref_name }}
+            **提交:** ${{ github.sha }}
+            
+            ### 📦 包含文件:
+            - Android APK (Release)
+            - Windows EXE (Release)
+            
+          files: flutter-builds.zip
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
