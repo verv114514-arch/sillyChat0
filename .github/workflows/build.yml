@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: '3.24.0'  # 更新为更高版本，对应 Dart SDK >= 3.5.4
+  FLUTTER_VERSION: '3.27.0'  # 更新为更高版本，对应 Dart SDK >= 3.5.4
   OUTPUT_DIR: build_output
 
 jobs:
