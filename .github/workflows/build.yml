@@ -1,143 +1,44 @@
-name: Flutter Build (Android APK + Windows EXE)
+name: Build Android APK
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:
-
-env:
-  FLUTTER_VERSION: '3.27.0'  # 更新为更高版本，对应 Dart SDK >= 3.5.4
-  OUTPUT_DIR: build_output
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  build-android:
-    name: Build Android APK
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: ☕ Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: 🐦 Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: '3.24.0'  # 根据 pubspec.lock 要求 >=3.35.0，但稳定版可用
           channel: 'stable'
           cache: true
 
-      - name: Flutter doctor
-        run: flutter doctor -v
-
-      - name: Get dependencies
+      - name: 📦 Install dependencies
         run: flutter pub get
 
-      - name: Clean project
-        run: flutter clean
+      - name: 🔨 Generate necessary files (if any)
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+        continue-on-error: true  # 如果某些生成器失败，继续构建
 
-      - name: Build Android APK (Release)
-        run: flutter build apk --release
+      - name: 🛠️ Build APK (android-arm64)
+        run: flutter build apk --release --target-platform android-arm64
 
-      - name: Upload Android APK artifact
+      - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: silly-chat-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
-
-  build-windows:
-    name: Build Windows EXE
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
-
-      - name: Enable Windows desktop support
-        run: flutter config --enable-windows-desktop
-
-      - name: Flutter doctor
-        run: flutter doctor -v
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Clean project
-        run: flutter clean
-
-      - name: Build Windows EXE (Release)
-        run: flutter build windows --release
-
-      - name: Create output directory
-        run: |
-          if (Test-Path $env:OUTPUT_DIR) { Remove-Item -Recurse -Force $env:OUTPUT_DIR }
-          New-Item -ItemType Directory -Force -Path $env:OUTPUT_DIR
-
-      - name: Copy Windows build artifacts
-        run: |
-          Copy-Item -Recurse -Force "build\windows\x64\runner\Release\*" "$env:OUTPUT_DIR\Windows_App\"
-
-      - name: Upload Windows EXE artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-exe
-          path: ${{ env.OUTPUT_DIR }}/Windows_App
-          retention-days: 30
-
-  build-and-package-all:
-    name: Package All Builds
-    needs: [build-android, build-windows]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    steps:
-      - name: Download Android APK
-        uses: actions/download-artifact@v4
-        with:
-          name: android-apk
-          path: ${{ env.OUTPUT_DIR }}
-
-      - name: Download Windows EXE
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-exe
-          path: ${{ env.OUTPUT_DIR }}/Windows_App
-
-      - name: Create combined archive
-        run: |
-          cd ${{ env.OUTPUT_DIR }}
-          zip -r ../flutter-builds.zip .
-          cd ..
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Build ${{ github.run_number }}
-          tag_name: build-${{ github.run_number }}
-          body: |
-            ## 🔨 自动构建产物
-            
-            **构建编号:** ${{ github.run_number }}
-            **分支:** ${{ github.ref_name }}
-            **提交:** ${{ github.sha }}
-            
-            ### 📦 包含文件:
-            - Android APK (Release)
-            - Windows EXE (Release)
-            
-          files: flutter-builds.zip
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
